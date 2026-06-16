@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MagpieTTS-LF: Inference-Time Long-Form Speech Generation</title>
+  <style>
+    :root {
+      --accent: #2563eb;
+      --accent-light: #eff6ff;
+      --text: #111827;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --lf-bg: #76b900;
+      --lf-border: #76b900;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--text);
+      background: #fff;
+      line-height: 1.6;
+    }
+
+    /* ── Header ── */
+    header {
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem 1rem;
+      text-align: center;
+    }
+
+    header .venue {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      margin-bottom: 1rem;
+    }
+
+    header h1 {
+      font-size: clamp(1.4rem, 3vw, 2rem);
+      font-weight: 700;
+      line-height: 1.25;
+      margin-bottom: 1.25rem;
+    }
+
+    .authors {
+      font-size: 1rem;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+
+    .affiliation {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+    }
+
+    .links {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+    }
+
+    .links a, .links .link-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.4rem 1rem;
+      border: 1.5px solid var(--accent);
+      border-radius: 6px;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: background 0.15s;
+    }
+
+    .links a:hover { background: var(--accent-light); }
+
+    .links .link-badge {
+      opacity: 0.45;
+      cursor: default;
+    }
+
+    /* ── Sections ── */
+    section {
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 0 1.5rem 2.5rem;
+    }
+
+    section h2 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 0.4rem;
+      margin-bottom: 1rem;
+    }
+
+    .abstract-box {
+      background: #f9fafb;
+      border-left: 4px solid var(--accent);
+      padding: 1.1rem 1.25rem;
+      border-radius: 0 8px 8px 0;
+      font-size: 0.95rem;
+      line-height: 1.7;
+    }
+
+    /* ── Sample Table ── */
+    .sample-intro {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-bottom: 1.25rem;
+    }
+
+    .sample-table-wrap { overflow-x: auto; }
+
+    table.samples {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    table.samples thead tr {
+      background: #f3f4f6;
+    }
+
+    table.samples th {
+      padding: 0.65rem 0.9rem;
+      text-align: center;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    table.samples th.col-lf {
+      background: var(--lf-bg);
+      border-color: var(--lf-border);
+      color: #fff;
+    }
+
+    table.samples td {
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border);
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    table.samples td.col-lf {
+      background: var(--lf-bg);
+      border-color: var(--lf-border);
+      color: #fff;
+    }
+
+    table.samples td.row-label {
+      font-weight: 500;
+      text-align: left;
+      color: var(--muted);
+      white-space: nowrap;
+      background: #f9fafb;
+    }
+
+    audio {
+      width: 100%;
+      min-width: 260px;
+      height: 40px;
+      display: block;
+    }
+
+    table.samples td.text-cell {
+      text-align: left;
+      font-size: 0.82rem;
+      color: #374151;
+      line-height: 1.55;
+      background: #fafafa;
+      padding: 0.6rem 0.9rem;
+      font-style: italic;
+    }
+
+    /* ── Metrics ── */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-top: 0.5rem;
+    }
+
+    .metric-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .metric-card.best {
+      border-color: var(--lf-border);
+      background: var(--lf-bg);
+      color: #fff;
+    }
+
+    .metric-card h3 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+    }
+
+    .metric-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      padding: 0.15rem 0;
+    }
+
+    .metric-row .model { text-align: left; color: var(--muted); }
+    .metric-row .val   { font-weight: 600; }
+    .metric-row.ours .model, .metric-row.ours .val { color: #fff; font-weight: 700; }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--muted);
+      font-size: 0.82rem;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════
+     HEADER
+════════════════════════════════════════════════════ -->
+<header>
+  <h1>MagpieTTS-LF: Inference-Time Long-Form Speech Generation<br>Without Training on Long-Form Data</h1>
+
+  <p class="authors">
+    Subhankar Ghosh,&ensp;Jason Li,&ensp;Paarth Neekhara,&ensp;Shehzeen Hussain,&ensp;
+    Ryan Langman,&ensp;Xuesong Yang,&ensp;Roy Fejgin
+  </p>
+  <p class="affiliation">NVIDIA Corporation, USA</p>
+
+  <div class="links">
+    <span class="link-badge">
+      <!-- paper icon -->
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Paper (coming soon)
+    </span>
+    <a href="https://github.com/NVIDIA-NeMo/NeMo" target="_blank" rel="noopener">
+      <!-- github icon -->
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/></svg>
+      Code
+    </a>
+    <a href="manifest_hifitts-lf.jsonl" download="manifest_hifitts-lf.jsonl">
+      <!-- database icon -->
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+      Dataset (HifiTTS-LF)
+    </a>
+  </div>
+  <p style="font-size:0.85rem; color:var(--muted); margin-top:-0.5rem;">
+    Paper accepted at <strong>Interspeech 2026</strong>
+  </p>
+</header>
+
+<!-- ════════════════════════════════════════════════════
+     ABSTRACT
+════════════════════════════════════════════════════ -->
+<section>
+  <h2>Abstract</h2>
+  <div class="abstract-box">
+    Neural Text-to-Speech (TTS) systems achieve remarkable quality on short utterances but long-form speech generation shows
+    prosodic drift, speaker inconsistencies and sentence boundary artifacts. Existing approaches either compress sequences,
+    increase context length or naively concatenate independently synthesized chunks. We present an inference-time approach called
+    <strong>MagpieTTS-LF</strong> that enables MagpieTTS to produce coherent long-form speech without model retraining.
+    Our method introduces three key innovations: (1) <em>soft attention priors</em> to guide monotonic alignment while preserving
+    past and future context; (2) a <em>stateful inference algorithm</em> that maintains context across sentence chunks, ensuring
+    prosodic continuity; (3) <em>history-aware text encoding</em> that uses past text for discourse-level prosodic planning.
+    Experiments on long texts show significant improvements in long-range intelligibility, prosodic coherence, speaker consistency,
+    and boundary naturalness compared to other baselines.
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════
+     AUDIO SAMPLES
+════════════════════════════════════════════════════ -->
+<section>
+  <h2>Audio Samples</h2>
+  <p class="sample-intro">
+    All samples are generated from the <strong>Long-Form HifiTTS</strong> benchmark — multi-paragraph passages of ~3–4 minutes
+    each (English, HiFiTTS reference speakers). Each row is the same passage synthesized by each system.
+    <strong style="color:#76b900">MagpieTTS-LF</strong> (highlighted in green) is our proposed method.
+  </p>
+
+  <div class="sample-table-wrap">
+    <table class="samples">
+      <thead>
+        <tr>
+          <th style="text-align:left">Sample</th>
+          <th class="col-lf">MagpieTTS-LF<br><small>(Ours)</small></th>
+          <th>Qwen3-TTS</th>
+          <th>VibeVoice</th>
+          <th>XTTS</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <!-- Sample 1 -->
+        <tr>
+          <td class="text-cell" colspan="5">
+            <strong>Sample 1:</strong> The same law of eternal procession ranges all that we call the virtues, and extinguishes each in the light of a better. The great man will not be prudent in the popular sense; all his prudence will be so much deduction from his grandeur. But it behooves each to see, when he sacrifices prudence, to what god he devotes it; if to ease and pleasure, he had better be prudent still; if to a great trust, he can well spare his mule and panniers who has a winged chariot instead. Geoffrey draws on his boots to go through the woods, that his feet may be safer from the bite of snakes; Aaron never thinks of such a peril. In many years neither is harmed by such an accident. Yet it seems to me that with every precaution you take against such an evil you put yourself into the power of the evil. I suppose that the highest prudence is the lowest prudence. Is this too sudden a rushing from the centre to the verge of our orbit? Think how many times we shall fall back into pitiful calculations before we take up our rest in the great sentiment, or make the verge of to day the new centre. Besides, your bravest sentiment is familiar to the humblest men. The poor and the low have their way of expressing the last facts of philosophy as well as you. &#8220;Blessed be nothing&#8221; and &#8220;The worse things are, the better they are&#8221; are proverbs which express the transcendentalism of common life. One man&#8217;s justice is another&#8217;s injustice; one man&#8217;s beauty another&#8217;s ugliness; one man&#8217;s wisdom another&#8217;s folly; as one beholds the same objects from a higher point. One man thinks justice consists in paying debts, and has no measure in his abhorrence of another who is very remiss in this duty and makes the creditor wait tediously. But that second man has his own way of looking at things; asks himself Which debt must I pay first, the debt to the rich, or the debt to the poor? the debt of money, or the debt of thought to mankind, of genius to nature? For you, O broker, there is no other principle but arithmetic. For me, commerce is of trivial import; love, faith, truth of character, the aspiration of man, these are sacred; nor can I detach one duty, like you, from all other duties, and concentrate my forces mechanically on the payment of moneys. Let me live onward; you shall find that, though slower, the progress of my character will liquidate all these debts without injustice to higher claims. If a man should dedicate himself to the payment of notes, would not this be injustice? Does he owe no debt but money? And are all claims on him to be postponed to a landlord&#8217;s or a banker&#8217;s?
+          </td>
+        </tr>
+        <tr>
+          <td class="row-label">Sample 1</td>
+          <td class="col-lf"><audio controls src="magpietts-lf/audios/predicted_audio_0.wav"></audio></td>
+          <td><audio controls src="qwen3tts/audio/sample_0000.wav"></audio></td>
+          <td><audio controls src="vibevoice/sample_00000.wav"></audio></td>
+          <td><audio controls src="xtts/sample_00000.wav"></audio></td>
+        </tr>
+
+        <!-- Sample 2 -->
+        <tr>
+          <td class="text-cell" colspan="5">
+            <strong>Sample 2:</strong> First of all, condemn the life thou art now leading: but when thou hast condemned it, do not despair of thyself - be not like them of mean spirit, who once they have yielded, abandon themselves entirely and as it were allow the torrent to sweep them away. No; learn what the wrestling masters do. Has the boy fallen? &#8220;Rise,&#8221; they say, &#8220;wrestle again, till thy strength come to thee.&#8221; Even thus should it be with thee. For know that there is nothing more tractable than the human soul. It needs but to will, and the thing is done; the soul is set upon the right path: as on the contrary it needs but to nod over the task, and all is lost. For ruin and recovery alike are from within. It is the critical moment that shows the man. So when the crisis is upon you, remember that God, like a trainer of wrestlers, has matched you with a rough and stalwart antagonist. &#8220;To what end?&#8221; you ask. That you may prove the victor at the Great Games. Yet without toil and sweat this may not be! If thou wouldst make progress, be content to seem foolish and void of understanding with respect to outward things. Care not to be thought to know anything. If any should make account of thee, distrust thyself. Remember that in life thou shouldst order thy conduct as at a banquet. Has any dish that is being served reached thee? Stretch forth thy hand and help thyself modestly. Doth it pass thee by? Seek not to detain it. Has it not yet come? Send not forth thy desire to meet it, but wait until it reaches thee. Deal thus with children, thus with wife; thus with office, thus with wealth &#8212; and one day thou wilt be meet to share the Banquets of the Gods. But if thou dost not so much as touch that which is placed before thee, but despisest it, then shalt thou not only share the Banquets of the Gods, but their Empire also. Remember that thou art an actor in a play, and of such sort as the Author chooses, whether long or short. If it be his good pleasure to assign thee the part of a beggar, a ruler, or a simple citizen, thine it is to play it fitly. For thy business is to act the part assigned thee, well: to choose it, is another&#8217;s. Keep death and exile daily before thine eyes, with all else that men deem terrible, but more especially Death. Then wilt thou never think a mean though, nor covet anything beyond measure.
+          </td>
+        </tr>
+        <tr>
+          <td class="row-label">Sample 2</td>
+          <td class="col-lf"><audio controls src="magpietts-lf/audios/predicted_audio_1.wav"></audio></td>
+          <td><audio controls src="qwen3tts/audio/sample_0001.wav"></audio></td>
+          <td><audio controls src="vibevoice/sample_00001.wav"></audio></td>
+          <td><audio controls src="xtts/sample_00001.wav"></audio></td>
+        </tr>
+
+        <!-- Sample 3 -->
+        <tr>
+          <td class="text-cell" colspan="5">
+            <strong>Sample 3:</strong> This is the time of all sufficing laughter At idiotic things some one has done, And there is neither past nor vague hereafter. And all your body stretches in the sun And drinks the light in like a liquid thing; Filled with the divine languor of late spring. I was just aiming at the jagged hole Torn in the yellow sandbags of their trench, When something threw me sideways with a wrench, And the skies seemed to shrivel like a scroll And disappear... and propped against the bole Of a big elm I lay, and watched the clouds Float through the blue, deep sky in speckless crowds, And I was clean again, and young, and whole. Lord, what a dream that was! And what a doze Waiting for Bill to come along to class! I&#8217;ve cut it now - and he - Oh, hello, Fred! Why, what&#8217;s the matter? - here - don&#8217;t be an ass, Sit down and tell me! - What do you suppose? I dreamed I... A.M. I... wounded? &#8220;Y.O.U. A.R.E. DEAD.&#8221; Next, then, the peacock, gilt With all its feathers. Look, what gorgeous dyes Flow in the eyes! And how deep, lustrous greens are splashed and spilt Along the back, that like a sea wave&#8217;s crest Scatters soft beauty o&#8217;er th&#8217; emblazoned breast! A strange fowl! But most fit For feasts like this, whereby I honor one Pure as the sun! Yet glowing with the fiery zeal of it! Some wine? Your goblet&#8217;s empty? Let it foam! It is not often that you come to Rome! You like the Venice glass? Rippled with lines that float like women&#8217;s curls, Neck like a girl&#8217;s, Fierce glowing as a chalice in the Mass? You start - &#8217;twas artist then, not Pope who spoke! Ave Maria stella! - ah, it broke! &#8217;Tis said they break alone When poison writhes within. A foolish tale! What, you look pale? Caraffa, fetch a silver cup!... You own A Birth of Venus, now - or so I&#8217;ve heard, Lovely as the breast plumage of a bird. Also a Dancing Faun, Hewn with the lithe grace of Praxiteles; Globed pearls to please A sultan; golden veils that drop like lawn - How happy I could be with but a tithe Of your possessions, fortunate one! Don&#8217;t writhe But take these cushions here! Now for the fruit! Great peaches, satin skinned, Rough tamarind, Pomegranates red as lips - oh they come dear! But men like you we feast at any price - A plum perhaps? They&#8217;re looking rather nice!
+          </td>
+        </tr>
+        <tr>
+          <td class="row-label">Sample 3</td>
+          <td class="col-lf"><audio controls src="magpietts-lf/audios/predicted_audio_2.wav"></audio></td>
+          <td><audio controls src="qwen3tts/audio/sample_0002.wav"></audio></td>
+          <td><audio controls src="vibevoice/sample_00002.wav"></audio></td>
+          <td><audio controls src="xtts/sample_00002.wav"></audio></td>
+        </tr>
+
+        <!-- Sample 4 -->
+        <tr>
+          <td class="text-cell" colspan="5">
+            <strong>Sample 4:</strong> Well, I was tired of life; the silly folk, The tiresome noises, all the common things I loved once, crushed me with an iron yoke. I longed for the cool quiet and the dark, Under the common sod where louts and kings Lie down, serene, unheeding, careless, stark, Never to rise or move or feel again, Filled with the ecstasy of being dead.... I put the shining pistol to my head And pulled the trigger hard - I felt no pain, No pain at all; the pistol had missed fire I thought; then, looking at the floor, I saw My huddled body lying there - and awe Swept over me. I trembled - and looked up. About me was - not that, my heart&#8217;s desire, That small and dark abode of death and peace - But all from which I sought a vain release! The sky, the people and the staring sun Glared at me as before. I was undone. My last state ten times worse than was my first. Helpless I stood, befooled, betrayed, accursed, Fettered to Life forever, horribly; Caught in the meshes of Eternity, No further doors to break or bars to burst! Here, where men&#8217;s eyes were empty and as bright As the blank windows set in glaring brick, When the wind strengthens from the sea - and night Drops like a fog and makes the breath come thick; By the deserted paths, the vacant halls, One may see figures, twisted shades and lean, Like the mad shapes that crawl an Indian screen, Or paunchy smears you find on prison walls. Turn the knob gently! There&#8217;s the Thumbless Man, Still weaving glass and silk into a dream, Although the wall shows through him - and the Khan Journeys Cathay beside a paper stream. A Rabbit Woman chitters by the door - - Chilly the grave smell comes from the turned sod - Come - lift the curtain - and be cold before The silence of the eight men who were God! His black biretta clings like a hangman&#8217;s cap; under his twitching fingers the beads shiver and click, As he mumbles in his corner, the shadow deepens upon him; I will not confess!... Is he there or is it intenser shadow? Dark huddled coilings from the obscene depths, Black, formless shadow, Shadow. Doors creak; from secret parts of the chateau come the scuffle and worry of rats. Orange light drips from the guttering candles, Eddying over the vast embroideries of the bed Stirring the monstrous tapestries, Retreating before the sable impending gloom of the canopy With a swift thrust and sparkle of gold, Lipping my hands, Then Rippling back abashed before the ominous silences Like the swift turns and starts of an overpowered fencer Who sees before him Horror Behind him darkness, Shadow.
+          </td>
+        </tr>
+        <tr>
+          <td class="row-label">Sample 4</td>
+          <td class="col-lf"><audio controls src="magpietts-lf/audios/predicted_audio_3.wav"></audio></td>
+          <td><audio controls src="qwen3tts/audio/sample_0003.wav"></audio></td>
+          <td><audio controls src="vibevoice/sample_00003.wav"></audio></td>
+          <td><audio controls src="xtts/sample_00003.wav"></audio></td>
+        </tr>
+
+        <!-- Sample 5 -->
+        <tr>
+          <td class="text-cell" colspan="5">
+            <strong>Sample 5:</strong> Martin inquired about yaws, for here was a man who ought to know. He certainly did know, if we could judge by his scarred arms and legs and by the live ulcers that corroded in the midst of the scars. Oh, one got used to yaws, quoth Tom Butler. They were never really serious until they had eaten deep into the flesh. Then they attacked the walls of the arteries, the arteries burst, and there was a funeral. Several of the natives had recently died that way ashore. But what did it matter? If it wasn&#8217;t yaws, it was something else in the Solomons. I noticed that from this moment Martin displayed a swiftly increasing interest in his own yaws. Dosings with corrosive sublimate were more frequent, while, in conversation, he began to revert with growing enthusiasm to the clean climate of Kansas and all other things Kansan. Charmian and I thought that California was a little bit of all right. Henry swore by Rapa, and Tehei staked all on Bora Bora for his own blood&#8217;s sake; while Wada and Nakata sang the sanitary paean of Japan. One evening, as the Snark worked around the southern end of the island of Ugi, looking for a reputed anchorage, a Church of England missionary, a Mr. Drew, bound in his whaleboat for the coast of San Cristoval, came alongside and stopped for dinner. Martin, his legs swathed in Red Cross bandages till they looked like a mummy&#8217;s, turned the conversation upon yaws. Yes, said Mr. Drew, they were quite common in the Solomons. All white men caught them. My heart almost stood still waiting the answer. By that answer my professional medical prestige stood or fell. Martin, I could see, was quite sure it was going to fall. And then the answer - O blessed answer! Martin gave in handsomely, I&#8217;ll admit, and I am confident that at that moment, if I had asked permission to pull one of his teeth, he would not have denied me. All white men in the Solomons catch yaws, and every cut or abrasion practically means another yaw. Every man I met had had them, and nine out of ten had active ones. There was but one exception, a young fellow who had been in the islands five months, who had come down with fever ten days after he arrived, and who had since then been down so often with fever that he had had neither time nor opportunity for yaws.
+          </td>
+        </tr>
+        <tr>
+          <td class="row-label">Sample 5</td>
+          <td class="col-lf"><audio controls src="magpietts-lf/audios/predicted_audio_4.wav"></audio></td>
+          <td><audio controls src="qwen3tts/audio/sample_0004.wav"></audio></td>
+          <td><audio controls src="vibevoice/sample_00004.wav"></audio></td>
+          <td><audio controls src="xtts/sample_00004.wav"></audio></td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════
+     RESULTS SUMMARY
+════════════════════════════════════════════════════ -->
+<section>
+  <h2>Key Results</h2>
+  <div class="metrics-grid">
+
+    <div class="metric-card best">
+      <h3>Word Error Rate ↓</h3>
+      <div class="metric-row ours"><span class="model">MagpieTTS-LF</span><span class="val">0.025</span></div>
+      <div class="metric-row"><span class="model">Qwen3-TTS</span><span class="val">0.045</span></div>
+      <div class="metric-row"><span class="model">XTTS</span><span class="val">0.051</span></div>
+      <div class="metric-row"><span class="model">VibeVoice</span><span class="val">0.115</span></div>
+    </div>
+
+    <div class="metric-card best">
+      <h3>Speaker Sim — WavLM ↑</h3>
+      <div class="metric-row ours"><span class="model">MagpieTTS-LF</span><span class="val">0.979</span></div>
+      <div class="metric-row"><span class="model">Qwen3-TTS</span><span class="val">0.958</span></div>
+      <div class="metric-row"><span class="model">XTTS</span><span class="val">0.929</span></div>
+      <div class="metric-row"><span class="model">VibeVoice</span><span class="val">0.848</span></div>
+    </div>
+
+    <div class="metric-card best">
+      <h3>Energy Boundary ↓ (dB)</h3>
+      <div class="metric-row ours"><span class="model">MagpieTTS-LF</span><span class="val">14.04</span></div>
+      <div class="metric-row"><span class="model">Qwen3-TTS</span><span class="val">17.91</span></div>
+      <div class="metric-row"><span class="model">VibeVoice</span><span class="val">28.90</span></div>
+      <div class="metric-row"><span class="model">XTTS</span><span class="val">30.62</span></div>
+    </div>
+
+    <div class="metric-card best">
+      <h3>Prosodic Composite ↓</h3>
+      <div class="metric-row ours"><span class="model">MagpieTTS-LF</span><span class="val">0.4646</span></div>
+      <div class="metric-row"><span class="model">Qwen3-TTS</span><span class="val">0.5169</span></div>
+      <div class="metric-row"><span class="model">VibeVoice</span><span class="val">0.712</span></div>
+      <div class="metric-row"><span class="model">XTTS</span><span class="val">0.734</span></div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════
+     FOOTER
+════════════════════════════════════════════════════ -->
+<footer>
+  <p>
+    MagpieTTS-LF &mdash; NVIDIA Corporation &mdash; Interspeech 2026
+  </p>
+  <p style="margin-top:0.4rem">
+    {subhankarg, jasoli, pneekhara, shehzeenh, rlangman, xueyang, rfejgin}@nvidia.com
+  </p>
+</footer>
+
+</body>
+</html>
